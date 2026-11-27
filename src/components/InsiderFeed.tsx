@@ -24,6 +24,7 @@ interface InsiderFeedProps {
   sourceMode: DataSourceMode;
   isSyncing: boolean;
   syncError: string;
+  lastUpdated: string;
   watchlistTickers: Set<string>;
   onSyncLiveClusters: () => void;
   onOpenPasteModal: () => void;
@@ -42,6 +43,7 @@ export function InsiderFeed({
   sourceMode,
   isSyncing,
   syncError,
+  lastUpdated,
   watchlistTickers,
   onSyncLiveClusters,
   onOpenPasteModal,
@@ -116,15 +118,15 @@ export function InsiderFeed({
             type="button"
             className="btn"
             onClick={onSyncLiveClusters}
-            disabled={isSyncing || sourceMode !== 'live-proxy'}
+            disabled={isSyncing}
             title={
               sourceMode === 'live-proxy'
                 ? 'Fetch live cluster buys from OpenInsider via local proxy'
-                : 'Start local proxy with "npm run dev:full" for 1-click live sync'
+                : 'Refresh latest OpenInsider cluster-buy snapshot (updated every 6h via GitHub Actions)'
             }
           >
             <RefreshCw size={14} className={isSyncing ? 'spin' : ''} />
-            <span>{isSyncing ? 'Syncing…' : 'Sync Live OpenInsider'}</span>
+            <span>{isSyncing ? 'Refreshing…' : 'Refresh'}</span>
           </button>
 
           <button
@@ -177,12 +179,18 @@ export function InsiderFeed({
         <div className="kpi-card">
           <div className="kpi-label">Feed Status</div>
           <div className="kpi-value" style={{ fontSize: 17, paddingTop: 4 }}>
-            {sourceMode === 'live-proxy' ? 'Live Proxy Ready' : 'Standalone / Paste'}
+            {sourceMode === 'live-proxy'
+              ? 'Live Proxy Ready'
+              : lastUpdated
+                ? 'OpenInsider Snapshot'
+                : 'Sample Data'}
           </div>
           <div className="kpi-sub">
             {sourceMode === 'live-proxy'
               ? 'OpenInsider HTML parser active'
-              : 'Run npm run dev:full for auto-fetch'}
+              : lastUpdated
+                ? `Updated ${new Date(lastUpdated).toLocaleString()}`
+                : 'Click Refresh or Paste rows'}
           </div>
         </div>
       </div>

@@ -63,22 +63,44 @@ export function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  // Auto-detect optional local proxy on mount (only when running locally)
+  // Auto-detect optional local proxy on mount (only when running locally), otherwise load hosted snapshot
   useEffect(() => {
-    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    if (!isLocal && !import.meta.env.VITE_PROXY_URL) return;
     let cancelled = false;
-    fetch(`${PROXY_URL}/api/health`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.ok) {
-          setSourceMode('live-proxy');
+    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+    const loadSnapshot = async () => {
+      try {
+        const res = await fetch(`./data/insiders.json?t=${Date.now()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data?.trades) && data.trades.length > 0) {
+          setInsiderTrades(data.trades);
+          if (data.fetchedAt) setLastUpdated(data.fetchedAt);
         }
-      })
-      .catch(() => {
-        // Standalone Google AI Studio mode — proxy not running
-      });
+      } catch {
+        // Keep sample data fallback
+      }
+    };
+
+    if (isLocal || import.meta.env.VITE_PROXY_URL) {
+      fetch(`${PROXY_URL}/api/health`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!cancelled && data?.ok) {
+            setSourceMode('live-proxy');
+          } else if (!cancelled) {
+            loadSnapshot();
+          }
+        })
+        .catch(() => {
+          if (!cancelled) loadSnapshot();
+        });
+    } else {
+      loadSnapshot();
+    }
+
     return () => {
       cancelled = true;
     };
@@ -120,18 +142,23 @@ export function App() {
     setIsSyncing(true);
     setSyncError('');
     try {
-      const res = await fetch(`${PROXY_URL}/api/openinsider/clusters`);
+      const url =
+        sourceMode === 'live-proxy'
+          ? `${PROXY_URL}/api/openinsider/clusters`
+          : `./data/insiders.json?t=${Date.now()}`;
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || 'Could not fetch live OpenInsider cluster buys.');
+        throw new Error(data?.error || 'Could not refresh OpenInsider cluster buys.');
       }
       if (Array.isArray(data.trades) && data.trades.length > 0) {
         setInsiderTrades(data.trades);
+        if (data.fetchedAt) setLastUpdated(data.fetchedAt);
       } else {
         setSyncError('OpenInsider returned 0 rows — keeping existing dataset.');
       }
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : 'Live OpenInsider sync failed.');
+      setSyncError(err instanceof Error ? err.message : 'Refresh failed.');
     } finally {
       setIsSyncing(false);
     }
@@ -200,6 +227,7 @@ export function App() {
               sourceMode={sourceMode}
               isSyncing={isSyncing}
               syncError={syncError}
+              lastUpdated={lastUpdated}
               watchlistTickers={watchlistTickers}
               onSyncLiveClusters={handleSyncLiveClusters}
               onOpenPasteModal={() => setPasteModalMode('insiders')}
