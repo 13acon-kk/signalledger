@@ -1,0 +1,5 @@
+{
+  "name": "SignalLedger — Free Insider & Congressional Stock Tracker",
+  "description": "Hybrid Google AI Studio stock tracker using free SEC Form 4 (OpenInsider, SECForm4) and Congressional trade trackers (Quiver Quantitative, InsiderFinance) with Gemini Search grounding.",
+  "requestFramePermissions": []
+}
